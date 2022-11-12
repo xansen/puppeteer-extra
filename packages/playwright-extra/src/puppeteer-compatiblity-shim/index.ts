@@ -33,13 +33,6 @@ export const isPuppeteerCompat = (obj?: unknown): obj is PlaywrightObject => {
   return !!obj && typeof obj === 'object' && !!(obj as any).isCompatShim
 }
 
-const cache = {
-  objectToShim: new Map<PlaywrightObject, PlaywrightObject>(),
-  cdpSession: {
-    page: new Map<pw.Page | pw.Frame, pw.CDPSession>(),
-    browser: new Map<pw.Browser, pw.CDPSession>()
-  }
-}
 
 /** Augment a Playwright object with compatibility with certain Puppeteer methods */
 export function addPuppeteerCompat<
@@ -48,21 +41,15 @@ export function addPuppeteerCompat<
   if (!object || typeof object !== 'object') {
     return object
   }
-  if (cache.objectToShim.has(object)) {
-    return cache.objectToShim.get(object) as Input
-  }
   if (isPuppeteerCompat(object)) {
     return object
   }
-  debug('addPuppeteerCompat', cache.objectToShim.size)
   if (isPlaywrightPage(object) || isPlaywrightFrame(object)) {
     const shim = createPageShim(object)
-    cache.objectToShim.set(object, shim)
     return shim as Input
   }
   if (isPlaywrightBrowser(object)) {
     const shim = createBrowserShim(object)
-    cache.objectToShim.set(object, shim)
     return shim as Input
   }
   debug('Received unknown object:', Reflect.ownKeys(object))
@@ -80,18 +67,12 @@ const dummyCDPClient = {
 } as pw.CDPSession
 
 export async function getPageCDPSession(page: pw.Page | pw.Frame) {
-  let session = cache.cdpSession.page.get(page)
-  if (session) {
-    debug('getPageCDPSession: use existing')
-    return session
-  }
   debug('getPageCDPSession: use new')
   const context = isPlaywrightFrame(page)
     ? page.page().context()
     : page.context()
   try {
-    session = await context.newCDPSession(page)
-    cache.cdpSession.page.set(page, session)
+    const session = await context.newCDPSession(page)
     return session
   } catch (err: any) {
     debug('getPageCDPSession: error while creating session:', err.message)
@@ -103,15 +84,9 @@ export async function getPageCDPSession(page: pw.Page | pw.Frame) {
 }
 
 export async function getBrowserCDPSession(browser: pw.Browser) {
-  let session = cache.cdpSession.browser.get(browser)
-  if (session) {
-    debug('getBrowserCDPSession: use existing')
-    return session
-  }
   debug('getBrowserCDPSession: use new')
   try {
-    session = await browser.newBrowserCDPSession()
-    cache.cdpSession.browser.set(browser, session)
+    const session = await browser.newBrowserCDPSession()
     return session
   } catch (err: any) {
     debug('getBrowserCDPSession: error while creating session:', err.message)
