@@ -16,12 +16,22 @@ export class HcaptchaContentScript {
   private opts: types.ContentScriptOpts
   private data: types.ContentScriptData
 
-  private baseUrl = 'assets.hcaptcha.com/captcha/v1/'
+  private baseUrls = [
+    'assets.hcaptcha.com/captcha/v1/',
+    'newassets.hcaptcha.com/captcha/v1/',
+  ]
 
   constructor(
     opts = ContentScriptDefaultOpts,
     data = ContentScriptDefaultData
   ) {
+    // Workaround for https://github.com/esbuild-kit/tsx/issues/113
+    if (typeof globalThis.__name === 'undefined') {
+      globalThis.__defProp = Object.defineProperty
+      globalThis.__name = (target, value) =>
+        globalThis.__defProp(target, 'name', { value, configurable: true })
+    }
+
     this.opts = opts
     this.data = data
   }
@@ -57,7 +67,7 @@ export class HcaptchaContentScript {
   /** Regular checkboxes */
   private _findRegularCheckboxes() {
     const nodeList = document.querySelectorAll<HTMLIFrameElement>(
-      `iframe[src*='${this.baseUrl}'][data-hcaptcha-widget-id]:not([src*='invisible'])`
+      this.baseUrls.map(url => `iframe[src*='${url}'][data-hcaptcha-widget-id]:not([src*='invisible'])`).join(',')
     )
     return Array.from(nodeList)
   }
@@ -65,7 +75,7 @@ export class HcaptchaContentScript {
   /** Find active challenges from invisible hcaptchas */
   private _findActiveChallenges() {
     const nodeList = document.querySelectorAll<HTMLIFrameElement>(
-      `div[style*='visible'] iframe[src*='${this.baseUrl}'][src*='hcaptcha.html']`
+      this.baseUrls.map(url => `div[style*='visible'] iframe[src*='${url}'][src*='hcaptcha.html']`).join(',')
     )
     return Array.from(nodeList)
   }
